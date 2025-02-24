@@ -121,3 +121,17 @@ async def yandex_callback(code: str, request: Request):
 async def get_login_history(user_data: User = Depends(get_current_user)):
     logs = await LogDAO.find_all(user_id=user_data.id)
     return logs
+
+@router.post("/make_admin/")
+async def make_admin(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user)
+):
+    user_to_update = await UsersDAO.find_one_or_none_by_id(user_id)
+    if not user_to_update:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден"
+        )
+    await UsersDAO.update(filter_by={"id": user_id}, is_admin=True)
+    return {"message": f"Пользователь {user_to_update.email} теперь администратор"}
