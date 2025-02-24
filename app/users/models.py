@@ -1,4 +1,4 @@
-from sqlalchemy import text
+from sqlalchemy import text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base, str_uniq, int_pk
 
@@ -21,3 +21,11 @@ class User(Base):
 
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self.id})"
+
+
+class Log(Base):
+    id: Mapped[int_pk]
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self.id}, user_id={self.user_id})"

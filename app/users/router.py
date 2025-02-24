@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, status, Response, Depends, Request
 from fastapi.responses import RedirectResponse
 from app.users.auth import get_password_hash, authenticate_user, create_access_token
-from app.users.dao import UsersDAO
+from app.users.dao import UsersDAO, LogDAO
 from app.users.dependencies import get_current_user, get_current_admin_user
-from app.users.models import User
+from app.users.models import User, Log
 from app.users.schemas import SUserRegister, SUserAuth
 from app.config import settings
 import httpx
+from datetime import datetime
 
 router = APIRouter(prefix='/auth', tags=['Auth'])
 
@@ -24,6 +25,7 @@ async def register_user(user_data: SUserRegister) -> dict:
     await UsersDAO.add(**user_dict)
     return {'message': 'Вы успешно зарегистрированы!'}
 
+
 @router.post("/login/")
 async def auth_user(response: Response, user_data: SUserAuth):
     check = await authenticate_user(email=user_data.email, password=user_data.password)
@@ -32,30 +34,40 @@ async def auth_user(response: Response, user_data: SUserAuth):
                             detail='Неверная почта или пароль')
     access_token = create_access_token({"sub": str(check.id)})
     response.set_cookie(key="users_access_token", value=access_token, httponly=True)
+
+    # Логирование входа
+    await LogDAO.add(user_id=check.id)
+
     return {'access_token': access_token, 'refresh_token': None}
+
 
 @router.get("/me/")
 async def get_me(user_data: User = Depends(get_current_user)):
     return user_data
 
+
 @router.post("/logout/")
-async def logout_user(response: Response):
+async def logout_user(response: Response, user_data: User = Depends(get_current_user)):
     response.delete_cookie(key="users_access_token")
     return {'message': 'Пользователь успешно вышел из системы'}
+
 
 @router.get("/all_users/")
 async def get_all_users(user_data: User = Depends(get_current_admin_user)):
     return await UsersDAO.find_all()
 
+
 YANDEX_AUTH_URL = "https://oauth.yandex.ru/authorize"
 YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token"
 YANDEX_USER_INFO_URL = "https://login.yandex.ru/info"
+
 
 @router.get("/yandex/login/")
 async def login_via_yandex():
     return RedirectResponse(
         f"{YANDEX_AUTH_URL}?response_type=code&client_id={settings.YANDEX_CLIENT_ID}"
     )
+
 
 @router.get("/yandex/callback/")
 async def yandex_callback(code: str, request: Request):
@@ -99,4 +111,13 @@ async def yandex_callback(code: str, request: Request):
         access_token = create_access_token({"sub": str(user.id)})
         response = RedirectResponse(url="/")
         response.set_cookie(key="users_access_token", value=access_token, httponly=True)
+
+        # Логирование входа через Яндекс
+        await LogDAO.add(user_id=user.id)
+
         return response
+
+@router.get("/logs/")
+async def get_login_history(user_data: User = Depends(get_current_user)):
+    logs = await LogDAO.find_all(user_id=user_data.id)
+    return logs
