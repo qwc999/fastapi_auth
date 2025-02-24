@@ -1,0 +1,14 @@
+удаление/создание
+docker-compose down -v
+docker-compose up -d
+
+миграции
+cd app
+alembic init -t async migration
+cd ..
+
+alembic revision --autogenerate -m "Migration"
+alembic upgrade head                   применение миграции
+
+запуск сервиса
+uvicorn app.main:app --reload
