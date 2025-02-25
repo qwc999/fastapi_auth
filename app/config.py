@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ALGORITHM: str
     YANDEX_CLIENT_ID: str
     YANDEX_CLIENT_SECRET: str
+    TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_CHAT_ID: str
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")

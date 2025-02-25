@@ -8,6 +8,7 @@ from app.users.schemas import SUserRegister, SUserAuth
 from app.config import settings
 import httpx
 from datetime import datetime
+import pika
 
 router = APIRouter(prefix='/auth', tags=['Auth'])
 
@@ -23,6 +24,24 @@ async def register_user(user_data: SUserRegister) -> dict:
     user_dict = user_data.dict()
     user_dict['password'] = get_password_hash(user_data.password)
     await UsersDAO.add(**user_dict)
+
+    # Отправка сообщения в RabbitMQ
+    credentials = pika.PlainCredentials('admin', 'admin')
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+        host='localhost',
+        port=5672,
+        credentials=credentials))
+    channel = connection.channel()
+    channel.queue_declare(queue='user_registration', durable=True)
+    channel.basic_publish(
+        exchange='',
+        routing_key='user_registration',
+        body=f"{user_data.first_name} {user_data.last_name} {user_data.email}",
+        properties=pika.BasicProperties(
+            delivery_mode=2,  # make message persistent
+        ))
+    connection.close()
+
     return {'message': 'Вы успешно зарегистрированы!'}
 
 
